@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -83,6 +84,71 @@ def _write_new_agent_yaml(payload: Dict[str, Any]) -> str:
     return str(out)
 
 
+def _build_tech_workflow_prompt(feature_name: str, branch_name: str, release_env: str) -> str:
+    return (
+        f"CTO command for feature: {feature_name}\n\n"
+        "Output in this exact structure:\n"
+        "## DEV PLAN\n"
+        "- Breakdown task into phases, modules, and estimated complexity.\n"
+        "- Mention impacted files/components and migration needs.\n"
+        "- Include rollback-safe implementation steps.\n\n"
+        "## QA PLAN\n"
+        "- Define unit, integration, and e2e test scope.\n"
+        "- List failure scenarios, regression hotspots, and acceptance criteria.\n"
+        "- Provide a release-go/no-go gate checklist.\n\n"
+        "## DEPLOY PLAN\n"
+        "- Branch strategy and PR steps for deployment readiness.\n"
+        "- Environment rollout sequence and post-deploy monitoring checks.\n"
+        "- Explicit rollback strategy if KPI or error budget degrades.\n\n"
+        "## PRE-PUSH CHECKLIST\n"
+        "- Lint/test/build status\n"
+        "- Security and secrets scan\n"
+        "- Changelog and release note summary\n"
+        "- Final push recommendation\n\n"
+        f"Constraints:\n- Working branch: {branch_name}\n- Target environment: {release_env}\n"
+    )
+
+
+def _safe_dt(ts: str) -> datetime | None:
+    if not ts:
+        return None
+    try:
+        return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _progress_metrics(tickets: List[Dict[str, Any]]) -> Dict[str, Any]:
+    if not tickets:
+        return {"today_count": 0, "dod_pass_rate": 0, "avg_duration_sec": 0, "last_ticket": "-"}
+
+    now = datetime.now(timezone.utc)
+    today_count = 0
+    pass_count = 0
+    total_dod = 0
+    durations: List[int] = []
+    for t in tickets:
+        dt = _safe_dt(str(t.get("created_at", "")))
+        if dt and dt.astimezone(timezone.utc).date() == now.date():
+            today_count += 1
+        dod_status = (t.get("dod", {}) or {}).get("status")
+        if dod_status:
+            total_dod += 1
+            if dod_status == "pass":
+                pass_count += 1
+        durations.append(int(t.get("duration_seconds", 0) or 0))
+
+    dod_pass_rate = round((pass_count / total_dod) * 100, 2) if total_dod else 0
+    avg_duration_sec = round(sum(durations) / len(durations), 2) if durations else 0
+    last_ticket = tickets[-1].get("ticket_id", "-") if tickets else "-"
+    return {
+        "today_count": today_count,
+        "dod_pass_rate": dod_pass_rate,
+        "avg_duration_sec": avg_duration_sec,
+        "last_ticket": last_ticket,
+    }
+
+
 def render_dashboard() -> None:
     load_dotenv(ROOT / ".env")
     st.set_page_config(page_title="Arvela Company OS", page_icon="A", layout="wide")
@@ -100,7 +166,7 @@ def render_dashboard() -> None:
     c3.metric("Tickets", str(len(tickets)))
     c4.metric("Budget % Used", str(budget.get("totals", {}).get("consumed_pct", 0)))
 
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs(
         [
             "Overview",
             "Org Chart",
@@ -111,6 +177,8 @@ def render_dashboard() -> None:
             "Audit Log",
             "Hire Agent",
             "Config + Repo",
+            "Help",
+            "Progress",
         ]
     )
 
@@ -214,12 +282,35 @@ def render_dashboard() -> None:
     with tab4:
         st.subheader("Manual Ticket")
         st.caption("Assign one specific task to a single agent (for example CTO) without running full pipeline.")
+
+        st.markdown("### Tech Workflow Focus")
+        tf1, tf2, tf3 = st.columns(3)
+        tech_feature = tf1.text_input("Feature / Epic", value="CI-safe release pipeline hardening", key="tech_feature")
+        tech_branch = tf2.text_input("Working Branch", value="feature/tech-hardening", key="tech_branch")
+        tech_env = tf3.selectbox("Target Environment", ["staging", "production"], index=0, key="tech_env")
+        if st.button("Autofill Dev -> QA -> Deployment Command"):
+            st.session_state["manual_ticket_task"] = _build_tech_workflow_prompt(
+                feature_name=tech_feature,
+                branch_name=tech_branch,
+                release_env=tech_env,
+            )
+            st.session_state["manual_ticket_objective"] = "Deliver technical execution with QA gate and deployment safety"
+
         t1, t2 = st.columns(2)
         mt_agent = t1.selectbox("Assign to Agent", ["ceo", "cpo", "cto", "cmo"], index=2)
-        mt_objective = t2.text_input("Context Objective", value="Ship technical implementation and release safely")
+        if "manual_ticket_objective" not in st.session_state:
+            st.session_state["manual_ticket_objective"] = "Ship technical implementation and release safely"
+        if "manual_ticket_task" not in st.session_state:
+            st.session_state["manual_ticket_task"] = _build_tech_workflow_prompt(
+                feature_name=tech_feature,
+                branch_name=tech_branch,
+                release_env=tech_env,
+            )
+        mt_objective = t2.text_input("Context Objective", key="manual_ticket_objective")
         mt_task = st.text_area(
             "Task Command",
             height=180,
+            key="manual_ticket_task",
             placeholder="Example: CTO, produce implementation plan, risks, test strategy, and release checklist before git push.",
         )
         if st.button("Submit Manual Ticket", type="primary"):
@@ -227,13 +318,17 @@ def render_dashboard() -> None:
                 st.error("Task Command is required.")
             else:
                 engine = PipelineEngine(ROOT)
+                if not hasattr(engine, "run_manual_ticket"):
+                    st.error("Dashboard runtime is stale. Please restart Streamlit and try again.")
+                    st.stop()
                 try:
-                    result = engine.run_manual_ticket(
-                        agent_id=mt_agent,
-                        task=mt_task,
-                        objective=mt_objective,
-                        company_id=company_id,
-                    )
+                    with st.spinner("Executing manual ticket..."):
+                        result = engine.run_manual_ticket(
+                            agent_id=mt_agent,
+                            task=mt_task,
+                            objective=mt_objective,
+                            company_id=company_id,
+                        )
                     st.success(f"Manual ticket complete: {result['ticket'].get('ticket_id', '-')}")
                     st.write(f"Run: {result['run_id']} | Agent: {result['agent_id']} | Output key: {result['output_key']}")
                     st.code(result.get("output", "")[:12000], language="markdown")
@@ -400,6 +495,39 @@ def render_dashboard() -> None:
             st.write(f"Files: {repo_stats['file_count']}")
             sample = sorted([str(p.relative_to(ROOT)) for p in (ROOT / "arvela-competitor").glob("**/*") if p.is_file()])[:50]
             st.code("\n".join(sample), language="text")
+
+    with tab10:
+        st.subheader("Quick Help")
+        cheat = ROOT / "CHEATSHEET.md"
+        if cheat.exists():
+            st.markdown(cheat.read_text(encoding="utf-8"))
+        else:
+            st.info("Cheatsheet file not found.")
+
+    with tab11:
+        st.subheader("AI Work Progress")
+        m = _progress_metrics(tickets)
+        p1, p2, p3, p4 = st.columns(4)
+        p1.metric("Tickets Today", str(m["today_count"]))
+        p2.metric("DoD Pass Rate", f"{m['dod_pass_rate']}%")
+        p3.metric("Avg Duration", f"{m['avg_duration_sec']} sec")
+        p4.metric("Last Ticket", str(m["last_ticket"]))
+
+        st.markdown("### Latest Tickets")
+        latest_rows = []
+        for t in tickets[-20:][::-1]:
+            latest_rows.append(
+                {
+                    "ticket_id": t.get("ticket_id"),
+                    "agent": t.get("agent_id"),
+                    "run_id": t.get("run_id"),
+                    "dod": (t.get("dod", {}) or {}).get("status"),
+                    "duration_seconds": t.get("duration_seconds"),
+                    "cost_usd": (t.get("model", {}) or {}).get("cost_usd"),
+                    "created_at": t.get("created_at"),
+                }
+            )
+        st.dataframe(latest_rows, width="stretch")
 
 
 def summary(root: Path) -> dict:

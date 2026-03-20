@@ -1,0 +1,33 @@
+pipeline_id: "tech_delivery"
+display_name: "Tech Delivery (Dev-QA-Deploy)"
+company_id: "arvela"
+enabled: true
+
+objective:
+  text: "[REQUIRED]"
+  focus_area: "technology"
+  horizon: "sprint"
+
+sequence:
+  - step: 1
+    agent_id: "cto"
+    task: "Create Dev -> QA -> Deployment execution plan with risk gates, rollback, and pre-push checklist."
+    skip_if: null
+    timeout_minutes: 10
+
+on_dod_failure:
+  action: "halt"
+  max_retries: 1
+  retry_prompt_suffix: "Your output missed: {failed_checks}"
+  notify_agent: "ceo"
+
+pipeline_budget:
+  max_total_usd: 2.5
+  on_exceeded: "halt"
+
+output:
+  save_individual: true
+  save_combined_report: true
+  combined_report_format: "markdown"
+  output_dir: "storage/outputs"
+  timestamp_files: true
