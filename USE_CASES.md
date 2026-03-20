@@ -1,10 +1,21 @@
 # Arvela Use Cases (Pergerakan Demo)
 
 ## Prasyarat
-- API jalan di port 8012:
-  - `C:/Users/ACER/AppData/Local/Python/pythoncore-3.14-64/python.exe main.py --mode api --host 127.0.0.1 --port 8012`
-- Dashboard jalan di port 8502:
-  - `C:/Users/ACER/AppData/Local/Python/pythoncore-3.14-64/python.exe -m streamlit run ui/dashboard.py --server.address 127.0.0.1 --server.port 8502`
+- API jalan (contoh di port 8013):
+   - `C:/Users/ACER/AppData/Local/Python/pythoncore-3.14-64/python.exe main.py --mode api --host 127.0.0.1 --port 8013`
+- Dashboard jalan (contoh di port 8502):
+   - `C:/Users/ACER/AppData/Local/Python/pythoncore-3.14-64/python.exe -m streamlit run ui/dashboard.py --server.address 127.0.0.1 --server.port 8502`
+- Pastikan semua endpoint API di bawah memakai host/port yang sama dengan saat API dijalankan.
+
+## Nilai Yang Wajib Diganti
+- `company_id`:
+   - default: `arvela`
+   - tenant baru: `arvela_clone` atau nama lain milikmu
+- `webhook_url`:
+   - jangan pakai placeholder `https://your-webhook-url`
+   - pakai URL endpoint asli milikmu (contoh service test: webhook.site)
+- `objective`:
+   - isi dengan objective real sesuai fokus sprint/board saat itu
 
 ## Use Case 1 - Trigger Pipeline Manual (Board Action)
 1. Buka dashboard tab `Run Pipeline`.
@@ -54,10 +65,10 @@
 ## Use Case 5 - Notification Routing Test
 1. Simpan config notifikasi:
    - `POST /api/v1/arvela/notifications/config`
-   - contoh body:
+    - contoh body (ganti `webhook_url` dengan URL milikmu):
      {
        "enabled": true,
-       "webhook_url": "https://your-webhook-url",
+          "webhook_url": "https://webhook.site/<ganti-dengan-id-kamu>",
        "events": {
          "pipeline_complete": true,
          "dod_failure": true,
@@ -66,7 +77,7 @@
      }
 2. Test kirim notifikasi:
    - `POST /api/v1/arvela/notifications/test`
-3. Jalankan pipeline dan verifikasi webhook menerima event `pipeline_complete`.
+3. Jalankan pipeline lalu verifikasi endpoint webhook menerima event `pipeline_complete`.
 
 ## Use Case 6 - Explore Cloned Competitor Repo
 1. Buka dashboard tab `Config + Repo`.
