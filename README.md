@@ -57,6 +57,14 @@ pnpm safe:push -- --message "feat: your change summary" --branch feature/your-br
 
 3. Non-interactive mode with email + token (VPS/CI friendly):
 
+Create env file first in the repository root:
+
+```bash
+cp .env.example .env
+```
+
+Then fill `GITHUB_EMAIL`, `GITHUB_NAME`, and `GITHUB_TOKEN` in `.env`.
+
 ```bash
 export GITHUB_EMAIL="you@example.com"
 export GITHUB_NAME="Your Name"
