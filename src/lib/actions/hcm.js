@@ -221,3 +221,72 @@ export async function getPerformanceCorrelation(employeeId) {
 
     return { trainings, metrics }
 }
+
+function getOrchestratorBaseUrl() {
+    return (
+        process.env.ORCHESTRATOR_API_BASE ||
+        process.env.NEXT_PUBLIC_ORCHESTRATOR_API_BASE ||
+        'http://127.0.0.1:8013'
+    )
+}
+
+export async function runTechDeliveryPlan({ companyId, objective }) {
+    const { profile } = await getAuthProfile({ requireAdmin: true })
+    const targetCompanyId = companyId || profile.company_id || 'arvela'
+    const finalObjective = (objective || '').trim()
+    if (!finalObjective) throw new Error('Objective is required')
+
+    const base = getOrchestratorBaseUrl()
+    const resp = await fetch(`${base}/api/v1/${targetCompanyId}/pipelines/tech_delivery/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ objective: finalObjective }),
+        cache: 'no-store',
+    })
+
+    if (!resp.ok) {
+        const msg = await resp.text()
+        throw new Error(`Orchestrator error: ${resp.status} ${msg}`)
+    }
+    const data = await resp.json()
+    revalidatePath('/dashboard')
+    return { success: true, data }
+}
+
+export async function getTechWorkflowProgress({ companyId }) {
+    const { profile } = await getAuthProfile({ requireAdmin: true })
+    const targetCompanyId = companyId || profile.company_id || 'arvela'
+    const base = getOrchestratorBaseUrl()
+
+    const [runsResp, ticketsResp] = await Promise.all([
+        fetch(`${base}/api/v1/${targetCompanyId}/runs`, { cache: 'no-store' }),
+        fetch(`${base}/api/v1/${targetCompanyId}/tickets`, { cache: 'no-store' }),
+    ])
+
+    if (!runsResp.ok || !ticketsResp.ok) {
+        throw new Error('Unable to load orchestration progress')
+    }
+
+    const runsData = await runsResp.json()
+    const ticketsData = await ticketsResp.json()
+    const runs = runsData.items || []
+    const tickets = ticketsData.items || []
+
+    const total = tickets.length
+    const pass = tickets.filter((t) => t?.dod?.status === 'pass').length
+    const avgDuration = total
+        ? Number((tickets.reduce((a, t) => a + Number(t?.duration_seconds || 0), 0) / total).toFixed(2))
+        : 0
+
+    return {
+        success: true,
+        data: {
+            runsCount: runs.length,
+            ticketsCount: total,
+            dodPassRate: total ? Number(((pass / total) * 100).toFixed(2)) : 0,
+            avgDurationSec: avgDuration,
+            latestRunId: runs[0] || null,
+            latestTickets: tickets.slice(-8).reverse(),
+        },
+    }
+}

@@ -20,6 +20,7 @@ import {
     Cell, PieChart, Pie, Tooltip as RechartsTooltip
 } from 'recharts'
 import Link from 'next/link'
+import { getTechWorkflowProgress, runTechDeliveryPlan } from '@/lib/actions/hcm'
 
 export function OwnerDashboard() {
     const supabase = createClient()
@@ -31,6 +32,11 @@ export function OwnerDashboard() {
     const [okrAvg, setOkrAvg] = useState(0)
     const [topEmployees, setTopEmployees] = useState([])
     const [attendanceToday, setAttendanceToday] = useState({ present: 0, absent: 0 })
+    const [techObjective, setTechObjective] = useState('Harden dev-qa-deploy flow for next release without schema changes')
+    const [techLoading, setTechLoading] = useState(false)
+    const [techResult, setTechResult] = useState(null)
+    const [techProgress, setTechProgress] = useState(null)
+    const [techError, setTechError] = useState('')
 
     useEffect(() => {
         async function load() {
@@ -105,9 +111,39 @@ export function OwnerDashboard() {
             setAttendanceToday({ present, absent: absent || (emps.length - present) }) // Rough estimation
 
             setLoading(false)
+
+            try {
+                const progress = await getTechWorkflowProgress({ companyId: cid })
+                if (progress?.success) {
+                    setTechProgress(progress.data)
+                }
+            } catch {
+                // Optional panel; ignore when orchestrator is unavailable.
+            }
         }
         load()
     }, [])
+
+    async function handleRunTechPlan() {
+        if (!profile?.company_id || !techObjective.trim()) return
+        setTechLoading(true)
+        setTechError('')
+        try {
+            const res = await runTechDeliveryPlan({
+                companyId: profile.company_id,
+                objective: techObjective,
+            })
+            setTechResult(res?.data || null)
+            const progress = await getTechWorkflowProgress({ companyId: profile.company_id })
+            if (progress?.success) {
+                setTechProgress(progress.data)
+            }
+        } catch (err) {
+            setTechError(err?.message || 'Failed to run tech delivery plan')
+        } finally {
+            setTechLoading(false)
+        }
+    }
 
     const COLORS = ['#ea580c', '#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5']
 
@@ -242,6 +278,93 @@ export function OwnerDashboard() {
                     )}
                 </Card>
             </div>
+
+            <Card className="p-8 border-none shadow-sm rounded-3xl space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                        <h2 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">AI Tech Workflow (Dev -> QA -> Deploy)</h2>
+                        <p className="text-sm font-medium text-foreground">Jalankan CTO orchestration plan langsung dari dashboard.</p>
+                    </div>
+                    <Badge variant="secondary" className="w-fit">No schema change</Badge>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <Card className="p-4 rounded-2xl border">
+                        <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Runs</p>
+                        <p className="text-2xl font-black">{techProgress?.runsCount ?? 0}</p>
+                    </Card>
+                    <Card className="p-4 rounded-2xl border">
+                        <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Tickets</p>
+                        <p className="text-2xl font-black">{techProgress?.ticketsCount ?? 0}</p>
+                    </Card>
+                    <Card className="p-4 rounded-2xl border">
+                        <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">DoD Pass</p>
+                        <p className="text-2xl font-black">{techProgress?.dodPassRate ?? 0}%</p>
+                    </Card>
+                    <Card className="p-4 rounded-2xl border">
+                        <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Avg Duration</p>
+                        <p className="text-2xl font-black">{techProgress?.avgDurationSec ?? 0}s</p>
+                    </Card>
+                    <Card className="p-4 rounded-2xl border">
+                        <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Latest Run</p>
+                        <p className="text-sm font-black break-all">{techProgress?.latestRunId ?? '-'}</p>
+                    </Card>
+                </div>
+
+                <div className="space-y-3">
+                    <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Objective</label>
+                    <textarea
+                        className="w-full min-h-28 rounded-2xl border bg-white p-4 text-sm"
+                        value={techObjective}
+                        onChange={(e) => setTechObjective(e.target.value)}
+                        placeholder="Write technical objective for CTO planning..."
+                    />
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={handleRunTechPlan}
+                            disabled={techLoading || !profile?.company_id}
+                            className="px-5 py-2 rounded-xl bg-slate-900 text-white text-sm font-bold disabled:opacity-60"
+                        >
+                            {techLoading ? 'Running...' : 'Run Tech Delivery Plan'}
+                        </button>
+                        {techError ? <p className="text-xs font-bold text-rose-600">{techError}</p> : null}
+                    </div>
+                </div>
+
+                {techResult ? (
+                    <div className="rounded-2xl border p-4 bg-slate-50 space-y-2">
+                        <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Latest Execution</p>
+                        <p className="text-sm"><span className="font-bold">Run ID:</span> {techResult.run_id || '-'}</p>
+                        <p className="text-sm break-all"><span className="font-bold">Report:</span> {techResult.combined_report || '-'}</p>
+                    </div>
+                ) : null}
+
+                {techProgress?.latestTickets?.length ? (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="text-left text-xs uppercase tracking-widest text-muted-foreground">
+                                    <th className="py-2">Ticket</th>
+                                    <th className="py-2">Agent</th>
+                                    <th className="py-2">DoD</th>
+                                    <th className="py-2">Duration</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {techProgress.latestTickets.map((t) => (
+                                    <tr key={t.ticket_id} className="border-t">
+                                        <td className="py-2 font-medium">{t.ticket_id}</td>
+                                        <td className="py-2">{t.agent_id}</td>
+                                        <td className="py-2">{t?.dod?.status || '-'}</td>
+                                        <td className="py-2">{t.duration_seconds || 0}s</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : null}
+            </Card>
         </div>
     )
 }
