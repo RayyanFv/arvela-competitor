@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs'
 import Link from 'next/link'
 import { ROLE_LABELS, ROLES } from '@/lib/constants/roles'
-import { getOrchestratorHealth, getTechWorkflowProgress, runTechDeliveryPlan } from '@/lib/actions/hcm'
+import { getOrchestratorHealth, getTechWorkflowProgress, runAutopilotBranchFlow, runTechDeliveryPlan } from '@/lib/actions/hcm'
 
 export function SuperAdminDashboard() {
     const supabase = createClient()
@@ -28,6 +28,13 @@ export function SuperAdminDashboard() {
     const [techError, setTechError] = useState('')
     const [orchestratorOnline, setOrchestratorOnline] = useState(false)
     const [orchestratorBase, setOrchestratorBase] = useState('')
+    const [autoPath, setAutoPath] = useState('src/app/dashboard/components/SuperAdminDashboard.jsx')
+    const [autoContent, setAutoContent] = useState('')
+    const [autoCommitMsg, setAutoCommitMsg] = useState('feat: super admin autopilot update')
+    const [autoBranch, setAutoBranch] = useState('feature/owner-tech-workflow')
+    const [autoLoading, setAutoLoading] = useState(false)
+    const [autoResult, setAutoResult] = useState('')
+    const [autoError, setAutoError] = useState('')
 
     useEffect(() => {
         async function load() {
@@ -115,6 +122,28 @@ export function SuperAdminDashboard() {
             setTechError(err?.message || 'Failed to run tech delivery plan')
         } finally {
             setTechLoading(false)
+        }
+    }
+
+    async function handleAutopilotPush() {
+        if (!autoPath.trim() || !autoContent.trim()) {
+            setAutoError('File path and content are required')
+            return
+        }
+        setAutoLoading(true)
+        setAutoError('')
+        setAutoResult('')
+        try {
+            const res = await runAutopilotBranchFlow({
+                changes: [{ path: autoPath.trim(), content: autoContent }],
+                commitMessage: autoCommitMsg,
+                branch: autoBranch,
+            })
+            setAutoResult(res?.data?.output || 'Autopilot done')
+        } catch (err) {
+            setAutoError(err?.message || 'Autopilot flow failed')
+        } finally {
+            setAutoLoading(false)
         }
     }
 
@@ -278,6 +307,70 @@ export function SuperAdminDashboard() {
                         ))}
                     </div>
                 )}
+            </Card>
+
+            <Card className="p-6 md:p-8 border-none shadow-sm rounded-3xl space-y-4">
+                <div>
+                    <h2 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Autopilot Coding (Super Admin)</h2>
+                    <p className="text-sm font-medium text-foreground">Write file change, run lint/test/build gates, then auto commit and push to branch.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                        <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Target File</label>
+                        <input
+                            className="w-full rounded-xl border bg-white p-3 text-sm"
+                            value={autoPath}
+                            onChange={(e) => setAutoPath(e.target.value)}
+                            placeholder="src/app/..."
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Branch</label>
+                        <input
+                            className="w-full rounded-xl border bg-white p-3 text-sm"
+                            value={autoBranch}
+                            onChange={(e) => setAutoBranch(e.target.value)}
+                            placeholder="feature/owner-tech-workflow"
+                        />
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Commit Message</label>
+                    <input
+                        className="w-full rounded-xl border bg-white p-3 text-sm"
+                        value={autoCommitMsg}
+                        onChange={(e) => setAutoCommitMsg(e.target.value)}
+                        placeholder="feat: ..."
+                    />
+                </div>
+
+                <div className="space-y-2">
+                    <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">File Content</label>
+                    <textarea
+                        className="w-full min-h-40 rounded-xl border bg-white p-3 text-sm"
+                        value={autoContent}
+                        onChange={(e) => setAutoContent(e.target.value)}
+                        placeholder="Paste full file content here"
+                    />
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <button
+                        type="button"
+                        onClick={handleAutopilotPush}
+                        disabled={autoLoading}
+                        className="px-5 py-2 rounded-xl bg-slate-900 text-white text-sm font-bold disabled:opacity-60"
+                    >
+                        {autoLoading ? 'Running gates + push...' : 'Run Autopilot Push'}
+                    </button>
+                    {autoError ? <p className="text-xs font-bold text-rose-600">{autoError}</p> : null}
+                </div>
+
+                {autoResult ? (
+                    <pre className="text-xs whitespace-pre-wrap rounded-xl border bg-slate-50 p-4 max-h-64 overflow-auto">{autoResult}</pre>
+                ) : null}
             </Card>
         </div>
     )

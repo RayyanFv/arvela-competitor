@@ -4,6 +4,9 @@ import { getAuthProfile } from '@/lib/actions/auth-helpers'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { ROLES } from '@/lib/constants/roles'
 import { revalidatePath } from 'next/cache'
+import fs from 'node:fs'
+import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 
 /**
  * Update the completion status of an onboarding task
@@ -315,5 +318,54 @@ export async function getOrchestratorHealth({ companyId }) {
                 base,
             },
         }
+    }
+}
+
+export async function runAutopilotBranchFlow({ changes, commitMessage, branch }) {
+    await getAuthProfile({ allowedRoles: [ROLES.SUPER_ADMIN] })
+
+    if (!Array.isArray(changes) || changes.length === 0) {
+        throw new Error('At least one file change is required')
+    }
+
+    const safeChanges = changes.map((c) => ({
+        path: String(c?.path || ''),
+        content: String(c?.content || ''),
+    }))
+
+    const root = process.cwd()
+    const autoDir = path.join(root, '.automation')
+    fs.mkdirSync(autoDir, { recursive: true })
+    const filePath = path.join(autoDir, `changes-${Date.now()}.json`)
+    fs.writeFileSync(filePath, JSON.stringify({ changes: safeChanges }, null, 2), 'utf-8')
+
+    const args = [
+        'scripts/auto_apply_gate_push.cjs',
+        '--changes-file',
+        filePath,
+        '--message',
+        commitMessage || 'chore: autopilot update',
+        '--branch',
+        branch || 'feature/owner-tech-workflow',
+    ]
+
+    const res = spawnSync(process.execPath, args, {
+        cwd: root,
+        encoding: 'utf-8',
+        env: process.env,
+    })
+
+    fs.unlinkSync(filePath)
+
+    if (res.status !== 0) {
+        throw new Error((res.stderr || res.stdout || 'Autopilot flow failed').trim())
+    }
+
+    revalidatePath('/dashboard')
+    return {
+        success: true,
+        data: {
+            output: (res.stdout || '').trim(),
+        },
     }
 }

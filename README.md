@@ -90,3 +90,30 @@ Notes:
 - If `GITHUB_TOKEN` is set, push uses token-based HTTPS auth without interactive login.
 - If `--open-pr true` and `GITHUB_TOKEN` are set, a PR will be created automatically.
 - CI guardrail is defined in `.github/workflows/guardrail-ci.yml`.
+
+## Autopilot Branch Flow (Write Code -> Gate -> Push, No PR)
+
+For super-admin automation where code changes are provided as a change-set JSON:
+
+```bash
+node scripts/auto_apply_gate_push.cjs --changes-file .automation/changes.json --message "feat: autopilot update" --branch feature/owner-tech-workflow
+```
+
+`changes.json` format:
+
+```json
+{
+	"changes": [
+		{
+			"path": "src/app/example/page.jsx",
+			"content": "export default function Page(){ return <div>Hello</div> }"
+		}
+	]
+}
+```
+
+Safety constraints:
+
+- Only writes to `src/**`, `public/**`, or `README.md`.
+- Runs lint/test/build gates before commit/push.
+- Pushes to branch only (no PR creation in this flow).
