@@ -8,7 +8,8 @@
     "start": "next start",
     "insight": "node scripts/repo_insight.cjs",
     "safe:push": "node scripts/auto_safe_push.cjs",
-    "autopilot:push": "node scripts/auto_apply_gate_push.cjs"
+    "autopilot:push": "node scripts/auto_apply_gate_push.cjs",
+    "orchestra:feature": "node scripts/one_command_superadmin.cjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",

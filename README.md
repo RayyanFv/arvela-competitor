@@ -112,6 +112,37 @@ node scripts/auto_apply_gate_push.cjs --changes-file .automation/changes.json --
 }
 ```
 
+## One Command Orchestration Flow (Simple)
+
+Tujuan: sekali jalan untuk trigger orchestration lalu langsung apply code + gate + commit + push branch.
+
+### 1) Buat file perubahan (contoh: Super Admin dashboard)
+
+```json
+{
+  "changes": [
+    {
+      "path": "src/app/dashboard/components/SuperAdminDashboard.jsx",
+      "content": "<isi full file terbaru di sini>"
+    }
+  ]
+}
+```
+
+Simpan misalnya sebagai `changes.superadmin.json`.
+
+### 2) Jalankan satu command
+
+```bash
+npm run orchestra:feature -- --objective "Update Super Admin dashboard for clearer orchestration controls" --changes-file ./changes.superadmin.json --branch feature/owner-tech-workflow --message "feat: improve super admin dashboard orchestration UX"
+```
+
+Flow yang dijalankan command ini:
+- Trigger `tech_delivery` pipeline di orchestrator
+- Apply perubahan file dari JSON changeset
+- Jalankan gate (`lint`/`test`/`build` jika tersedia)
+- Auto commit dan auto push ke branch target
+
 Safety constraints:
 
 - Only writes to `src/**`, `public/**`, or `README.md`.
