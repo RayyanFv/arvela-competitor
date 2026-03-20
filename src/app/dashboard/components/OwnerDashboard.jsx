@@ -282,7 +282,7 @@ export function OwnerDashboard() {
             <Card className="p-8 border-none shadow-sm rounded-3xl space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
-                        <h2 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">AI Tech Workflow (Dev -> QA -> Deploy)</h2>
+                        <h2 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">AI Tech Workflow (Dev to QA to Deploy)</h2>
                         <p className="text-sm font-medium text-foreground">Jalankan CTO orchestration plan langsung dari dashboard.</p>
                     </div>
                     <Badge variant="secondary" className="w-fit">No schema change</Badge>

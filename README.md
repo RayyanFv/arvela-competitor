@@ -34,3 +34,30 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Auto Safe Pipeline (Analyze -> Build -> Test -> Push)
+
+This repository includes automation helpers for a guarded push flow:
+
+1. Analyze repository structure and generate report:
+
+```bash
+pnpm insight
+```
+
+Report output:
+
+- `reports/repo-insight.md`
+
+2. Run guarded automation (analyze + build + optional test + commit + push):
+
+```bash
+pnpm safe:push -- --message "feat: your change summary" --branch feature/your-branch
+```
+
+Notes:
+
+- `pnpm build` is mandatory and must pass.
+- `pnpm test` runs if a test script exists; otherwise skipped.
+- Push happens only if there are staged/changed files after quality gates pass.
+- CI guardrail is defined in `.github/workflows/guardrail-ci.yml`.

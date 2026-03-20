@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "insight": "node scripts/repo_insight.cjs",
+    "safe:push": "node scripts/auto_safe_push.cjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
