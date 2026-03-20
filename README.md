@@ -55,9 +55,30 @@ Report output:
 pnpm safe:push -- --message "feat: your change summary" --branch feature/your-branch
 ```
 
+3. Non-interactive mode with email + token (VPS/CI friendly):
+
+```bash
+export GITHUB_EMAIL="you@example.com"
+export GITHUB_NAME="Your Name"
+export GITHUB_TOKEN="ghp_xxx"
+
+pnpm safe:push -- --message "feat: your change summary" --branch feature/your-branch --base main --open-pr true
+```
+
+PowerShell equivalent:
+
+```powershell
+$env:GITHUB_EMAIL="you@example.com"
+$env:GITHUB_NAME="Your Name"
+$env:GITHUB_TOKEN="ghp_xxx"
+pnpm safe:push -- --message "feat: your change summary" --branch feature/your-branch --base main --open-pr true
+```
+
 Notes:
 
 - `pnpm build` is mandatory and must pass.
 - `pnpm test` runs if a test script exists; otherwise skipped.
 - Push happens only if there are staged/changed files after quality gates pass.
+- If `GITHUB_TOKEN` is set, push uses token-based HTTPS auth without interactive login.
+- If `--open-pr true` and `GITHUB_TOKEN` are set, a PR will be created automatically.
 - CI guardrail is defined in `.github/workflows/guardrail-ci.yml`.
