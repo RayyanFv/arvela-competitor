@@ -231,7 +231,7 @@ function getOrchestratorBaseUrl() {
 }
 
 export async function runTechDeliveryPlan({ companyId, objective }) {
-    const { profile } = await getAuthProfile({ requireAdmin: true })
+    const { profile } = await getAuthProfile({ allowedRoles: [ROLES.SUPER_ADMIN] })
     const targetCompanyId = companyId || profile.company_id || 'arvela'
     const finalObjective = (objective || '').trim()
     if (!finalObjective) throw new Error('Objective is required')
@@ -254,7 +254,7 @@ export async function runTechDeliveryPlan({ companyId, objective }) {
 }
 
 export async function getTechWorkflowProgress({ companyId }) {
-    const { profile } = await getAuthProfile({ requireAdmin: true })
+    const { profile } = await getAuthProfile({ allowedRoles: [ROLES.SUPER_ADMIN] })
     const targetCompanyId = companyId || profile.company_id || 'arvela'
     const base = getOrchestratorBaseUrl()
 
@@ -288,5 +288,32 @@ export async function getTechWorkflowProgress({ companyId }) {
             latestRunId: runs[0] || null,
             latestTickets: tickets.slice(-8).reverse(),
         },
+    }
+}
+
+export async function getOrchestratorHealth({ companyId }) {
+    const { profile } = await getAuthProfile({ allowedRoles: [ROLES.SUPER_ADMIN] })
+    const targetCompanyId = companyId || profile.company_id || 'arvela'
+    const base = getOrchestratorBaseUrl()
+
+    try {
+        const resp = await fetch(`${base}/api/v1/${targetCompanyId}/agents`, { cache: 'no-store' })
+        return {
+            success: resp.ok,
+            data: {
+                online: resp.ok,
+                status: resp.status,
+                base,
+            },
+        }
+    } catch {
+        return {
+            success: false,
+            data: {
+                online: false,
+                status: 0,
+                base,
+            },
+        }
     }
 }

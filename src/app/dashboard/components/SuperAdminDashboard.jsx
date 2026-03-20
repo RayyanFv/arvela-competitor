@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Breadcrumbs } from '@/components/layout/Breadcrumbs'
 import Link from 'next/link'
 import { ROLE_LABELS, ROLES } from '@/lib/constants/roles'
-import { getTechWorkflowProgress, runTechDeliveryPlan } from '@/lib/actions/hcm'
+import { getOrchestratorHealth, getTechWorkflowProgress, runTechDeliveryPlan } from '@/lib/actions/hcm'
 
 export function SuperAdminDashboard() {
     const supabase = createClient()
@@ -26,6 +26,8 @@ export function SuperAdminDashboard() {
     const [techResult, setTechResult] = useState(null)
     const [techProgress, setTechProgress] = useState(null)
     const [techError, setTechError] = useState('')
+    const [orchestratorOnline, setOrchestratorOnline] = useState(false)
+    const [orchestratorBase, setOrchestratorBase] = useState('')
 
     useEffect(() => {
         async function load() {
@@ -78,6 +80,10 @@ export function SuperAdminDashboard() {
             setRecentUsers(users.slice(0, 8))
 
             try {
+                const health = await getOrchestratorHealth({ companyId: cid })
+                setOrchestratorOnline(Boolean(health?.data?.online))
+                setOrchestratorBase(health?.data?.base || '')
+
                 const progress = await getTechWorkflowProgress({ companyId: cid })
                 if (progress?.success) {
                     setTechProgress(progress.data)
@@ -171,8 +177,24 @@ export function SuperAdminDashboard() {
                         <h2 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">AI Tech Workflow (Super Admin)</h2>
                         <p className="text-sm font-medium text-foreground">Jalankan CTO orchestration plan langsung dari control panel.</p>
                     </div>
-                    <Badge variant="secondary" className="w-fit">No schema change</Badge>
+                    <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="w-fit">No schema change</Badge>
+                        <Badge className={orchestratorOnline ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}>
+                            {orchestratorOnline ? 'Orchestrator Connected' : 'Orchestrator Offline'}
+                        </Badge>
+                    </div>
                 </div>
+
+                <Card className="p-4 rounded-2xl border bg-slate-50">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">How To Use</p>
+                    <ol className="text-sm text-foreground space-y-1 list-decimal pl-5">
+                        <li>Pastikan login sebagai Super Admin.</li>
+                        <li>Cek status koneksi Orchestrator harus <strong>Connected</strong>.</li>
+                        <li>Tulis objective teknis yang jelas (tanpa ubah schema).</li>
+                        <li>Klik <strong>Run Tech Delivery Plan</strong> lalu pantau hasil di Latest Execution.</li>
+                    </ol>
+                    {orchestratorBase ? <p className="text-xs text-muted-foreground mt-3">Endpoint: {orchestratorBase}</p> : null}
+                </Card>
 
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                     <Card className="p-4 rounded-2xl border"><p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Runs</p><p className="text-2xl font-black">{techProgress?.runsCount ?? 0}</p></Card>
