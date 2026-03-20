@@ -100,11 +100,12 @@ def render_dashboard() -> None:
     c3.metric("Tickets", str(len(tickets)))
     c4.metric("Budget % Used", str(budget.get("totals", {}).get("consumed_pct", 0)))
 
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(
         [
             "Overview",
             "Org Chart",
             "Run Pipeline",
+            "Manual Ticket",
             "Cost Dashboard",
             "Runs",
             "Audit Log",
@@ -211,6 +212,37 @@ def render_dashboard() -> None:
                     st.error(f"Pipeline failed: {e}")
 
     with tab4:
+        st.subheader("Manual Ticket")
+        st.caption("Assign one specific task to a single agent (for example CTO) without running full pipeline.")
+        t1, t2 = st.columns(2)
+        mt_agent = t1.selectbox("Assign to Agent", ["ceo", "cpo", "cto", "cmo"], index=2)
+        mt_objective = t2.text_input("Context Objective", value="Ship technical implementation and release safely")
+        mt_task = st.text_area(
+            "Task Command",
+            height=180,
+            placeholder="Example: CTO, produce implementation plan, risks, test strategy, and release checklist before git push.",
+        )
+        if st.button("Submit Manual Ticket", type="primary"):
+            if not mt_task.strip():
+                st.error("Task Command is required.")
+            else:
+                engine = PipelineEngine(ROOT)
+                try:
+                    result = engine.run_manual_ticket(
+                        agent_id=mt_agent,
+                        task=mt_task,
+                        objective=mt_objective,
+                        company_id=company_id,
+                    )
+                    st.success(f"Manual ticket complete: {result['ticket'].get('ticket_id', '-')}")
+                    st.write(f"Run: {result['run_id']} | Agent: {result['agent_id']} | Output key: {result['output_key']}")
+                    st.code(result.get("output", "")[:12000], language="markdown")
+                    with st.expander("Ticket JSON"):
+                        st.json(result.get("ticket", {}))
+                except Exception as e:
+                    st.error(f"Manual ticket failed: {e}")
+
+    with tab5:
         st.subheader("Cost Dashboard")
         if not budget:
             st.info("Budget ledger not initialized yet.")
@@ -230,7 +262,7 @@ def render_dashboard() -> None:
             st.dataframe(agents_cost, width="stretch")
             st.json(budget.get("totals", {}))
 
-    with tab5:
+    with tab6:
         st.subheader("Run Explorer")
         if not runs:
             st.info("No runs found.")
@@ -245,7 +277,7 @@ def render_dashboard() -> None:
                 st.download_button("Download combined report", text, file_name=f"{run_id}_combined_report.md")
                 st.code(text[:8000], language="markdown")
 
-    with tab6:
+    with tab7:
         st.subheader("Audit Log")
         if not tickets:
             st.info("No tickets found.")
@@ -277,7 +309,7 @@ def render_dashboard() -> None:
                             st.json(t)
                             break
 
-    with tab7:
+    with tab8:
         st.subheader("Hire Agent")
         with st.form("hire_agent_form"):
             role_id = st.text_input("Role ID", value="custom_qa_engineer")
@@ -342,7 +374,7 @@ def render_dashboard() -> None:
             except Exception as e:
                 st.error(f"Failed to create agent: {e}")
 
-    with tab8:
+    with tab9:
         st.subheader("Agent Config")
         agents = _list_agent_configs()
         if not agents:

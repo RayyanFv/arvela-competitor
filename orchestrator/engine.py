@@ -23,6 +23,7 @@ class PipelineEngine:
     def __init__(self, root: Path):
         self.root = root
         self.validator = DoDValidator()
+
     def run(self, pipeline_id: str, objective: str, company_id: str | None = None) -> Dict[str, Any]:
         if not objective.strip():
             raise ValueError("objective is required")
@@ -62,6 +63,80 @@ class PipelineEngine:
         combined = self._save_combined_report(context)
         return {"run_id": run_id, "combined_report": str(combined)}
 
+    def run_manual_ticket(
+        self,
+        agent_id: str,
+        task: str,
+        objective: str,
+        company_id: str | None = None,
+    ) -> Dict[str, Any]:
+        if not task.strip():
+            raise ValueError("task is required")
+
+        company = self._load_company(company_id)
+        active_company_id = company["company_id"]
+        run_id = f"run_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+        context = build_start_context(
+            active_company_id,
+            objective.strip() or task.strip(),
+            self._company_summary(company),
+            run_id,
+        )
+        context["pipeline_id"] = "manual_ticket"
+        context["_run_spent_usd"] = 0.0
+
+        cfg = self._load_yaml(self.root / "config" / "agents" / f"{agent_id}.yaml")
+        step = {"step": 1, "agent_id": agent_id, "task": task}
+        pseudo_pipeline = {
+            "pipeline_id": "manual_ticket",
+            "on_dod_failure": {"action": "halt", "max_retries": 1},
+            "pipeline_budget": {"max_total_usd": float(cfg.get("budget", {}).get("per_run_limit_usd", 5.0))},
+        }
+
+        events = EventBus(self.root, active_company_id)
+        notifier = Notifier(self.root, active_company_id)
+        monthly_limits = self._agent_monthly_limits(active_company_id)
+        ledger = BudgetLedger(self.root, active_company_id)
+        ledger_data = ledger.load_or_init(monthly_limits)
+        ticketing = TicketSystem(self.root, active_company_id)
+        memory = MemoryStore(self.root, active_company_id)
+
+        events.emit(
+            "manual_ticket_requested",
+            "dashboard",
+            {"run_id": run_id, "company_id": active_company_id, "agent_id": agent_id, "task": task},
+        )
+
+        ticket = self._run_step(
+            step,
+            pseudo_pipeline,
+            context,
+            ledger,
+            ledger_data,
+            ticketing,
+            memory,
+            events,
+            notifier,
+        )
+
+        ledger.register_pipeline_cost(ledger_data, run_id, "manual_ticket", context["_costs"])
+        ledger.save(ledger_data)
+
+        events.emit(
+            "manual_ticket_complete",
+            "orchestrator",
+            {"run_id": run_id, "company_id": active_company_id, "agent_id": agent_id},
+        )
+
+        out_key = cfg.get("output_key", f"{agent_id}_output")
+        return {
+            "run_id": run_id,
+            "agent_id": agent_id,
+            "output_key": out_key,
+            "output": context.get(out_key, ""),
+            "ticket": ticket,
+        }
+
     def _run_step(
         self,
         step: Dict[str, Any],
@@ -73,11 +148,11 @@ class PipelineEngine:
         memory: MemoryStore,
         events: EventBus,
         notifier: Notifier,
-    ) -> None:
+    ) -> Dict[str, Any]:
         agent_id = step["agent_id"]
         cfg = self._load_yaml(self.root / "config" / "agents" / f"{agent_id}.yaml")
         if not cfg.get("enabled", True):
-            return
+            return {"status": "skipped", "reason": "agent_disabled", "agent_id": agent_id}
 
         allow = ledger.check_agent_can_run(ledger_data, agent_id)
         if not allow.allowed:
@@ -163,7 +238,7 @@ class PipelineEngine:
                 content=final.content,
                 max_entries=int(mem_cfg.get("max_memory_entries", 20)),
             )
-        ticketing.create_ticket(
+        ticket = ticketing.create_ticket(
             {
                 "run_id": context["run_id"],
                 "pipeline_id": context["pipeline_id"],
@@ -195,6 +270,7 @@ class PipelineEngine:
                 },
             }
         )
+        return ticket
 
     def _save_agent_output(self, company_id: str, run_id: str, agent_id: str, output_key: str, content: str) -> None:
         out_dir = self.root / "storage" / company_id / "outputs" / run_id
