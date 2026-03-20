@@ -1,0 +1,48 @@
+pipeline_id: "full_run"
+display_name: "Full C-Suite Run"
+company_id: "arvela"
+enabled: true
+
+objective:
+  text: "[REQUIRED]"
+  focus_area: "company"
+  horizon: "sprint"
+
+sequence:
+  - step: 1
+    agent_id: "ceo"
+    task: "Set strategic direction for the objective and assign 3 sprint priorities."
+    skip_if: null
+    timeout_minutes: 5
+  - step: 2
+    agent_id: "cpo"
+    task: "Create prioritized product plan aligned to CEO direction."
+    skip_if: null
+    timeout_minutes: 8
+  - step: 3
+    agent_id: "cto"
+    task: "Create technical execution plan and answer all CPO technical questions."
+    skip_if: null
+    timeout_minutes: 8
+  - step: 4
+    agent_id: "cmo"
+    task: "Build GTM and sales plan aligned with product and technical plan."
+    skip_if: null
+    timeout_minutes: 8
+
+on_dod_failure:
+  action: "halt"
+  max_retries: 1
+  retry_prompt_suffix: "Your output missed: {failed_checks}"
+  notify_agent: "ceo"
+
+pipeline_budget:
+  max_total_usd: 5.0
+  on_exceeded: "halt"
+
+output:
+  save_individual: true
+  save_combined_report: true
+  combined_report_format: "markdown"
+  output_dir: "storage/outputs"
+  timestamp_files: true

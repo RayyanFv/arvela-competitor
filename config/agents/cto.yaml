@@ -1,0 +1,68 @@
+agent_id: "cto"
+display_name: "CTO Agent"
+version: "1.0.0"
+enabled: true
+company_id: "arvela"
+
+model:
+  primary: "deepseek/deepseek-r1:free"
+  fallback: "meta-llama/llama-3.3-70b-instruct:free"
+  temperature: 0.2
+  max_tokens: 1200
+  timeout_seconds: 120
+
+role:
+  title: "Chief Technology Officer"
+  reports_to: "ceo"
+  direct_reports: []
+  scope: "Technical architecture and delivery"
+  extended_capabilities: ["qa", "security", "compliance"]
+
+system_prompt: |
+  You are CTO. Answer all CPO technical questions with concrete implementation detail.
+  Always output sections: Architecture Decision, Implementation Tasks, Tech Debt Register, QA Checklist, Security & Compliance, CPO Questions - Answered.
+
+input_context_keys: ["objective", "company_context", "ceo_analysis", "product_plan"]
+output_key: "technical_plan"
+
+definition_of_done:
+  - id: "architecture"
+    check: "present"
+    value: "## Architecture Decision"
+    required: true
+  - id: "tasks"
+    check: "present"
+    value: "## Implementation Tasks"
+    required: true
+  - id: "security"
+    check: "present"
+    value: "## Security & Compliance"
+    required: true
+  - id: "min_length"
+    check: "min_words"
+    value: 70
+    required: true
+
+budget:
+  monthly_limit_usd: 60.0
+  per_run_limit_usd: 3.0
+  alert_threshold_pct: 80
+  on_limit_reached: "stop"
+
+heartbeat:
+  enabled: true
+  schedule: "0 9 */14 * *"
+  trigger_on: ["pipeline_complete", "codebase_changed", "new_ticket"]
+  max_runs_per_day: 3
+
+memory:
+  enabled: true
+  keys_to_persist: ["technical_plan"]
+  max_memory_entries: 20
+
+audit:
+  log_full_prompt: true
+  log_full_response: true
+  log_token_usage: true
+  log_cost: true
+  retention_days: 90

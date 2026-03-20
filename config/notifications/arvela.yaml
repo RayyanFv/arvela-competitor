@@ -1,0 +1,5 @@
+enabled: true
+webhook_url: ''
+events:
+  pipeline_complete: true
+  dod_failure: true

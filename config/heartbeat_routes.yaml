@@ -1,0 +1,13 @@
+routes:
+  ceo:
+    pipeline_id: full_run
+    objective_template: "Heartbeat CEO review for {company_id}"
+  cpo:
+    pipeline_id: product_sprint
+    objective_template: "Heartbeat CPO sprint planning for {company_id}"
+  cto:
+    pipeline_id: product_sprint
+    objective_template: "Heartbeat CTO implementation review for {company_id}"
+  cmo:
+    pipeline_id: gtm_only
+    objective_template: "Heartbeat CMO GTM review for {company_id}"

@@ -1,0 +1,68 @@
+agent_id: "ceo"
+display_name: "CEO Agent"
+version: "1.0.0"
+enabled: true
+company_id: "arvela"
+
+model:
+  primary: "meta-llama/llama-3.3-70b-instruct:free"
+  fallback: "mistralai/mistral-7b-instruct:free"
+  temperature: 0.3
+  max_tokens: 1200
+  timeout_seconds: 120
+
+role:
+  title: "Chief Executive Officer"
+  reports_to: null
+  direct_reports: ["cpo", "cto", "cmo"]
+  scope: "Strategic direction and alignment"
+  extended_capabilities: ["okr", "risk"]
+
+system_prompt: |
+  You are CEO. Decide fast and clearly.
+  Always output sections: Strategic Summary, Decision, Top 3 Priorities, Risks, OKR Status, Open Questions.
+
+input_context_keys: ["objective", "company_context"]
+output_key: "ceo_analysis"
+
+definition_of_done:
+  - id: "strategic_summary"
+    check: "present"
+    value: "## Strategic Summary"
+    required: true
+  - id: "decision_stated"
+    check: "contains_keyword"
+    value: ["go", "no-go", "redirect", "proceed", "lanjutkan", "tunda"]
+    required: true
+  - id: "priorities_present"
+    check: "present"
+    value: "## Top 3 Priorities"
+    required: true
+  - id: "min_length"
+    check: "min_words"
+    value: 70
+    required: true
+
+budget:
+  monthly_limit_usd: 60.0
+  per_run_limit_usd: 3.0
+  alert_threshold_pct: 80
+  on_limit_reached: "stop"
+
+heartbeat:
+  enabled: true
+  schedule: "0 9 * * 1"
+  trigger_on: ["pipeline_complete", "dod_failure", "budget_threshold", "new_objective"]
+  max_runs_per_day: 3
+
+memory:
+  enabled: true
+  keys_to_persist: ["ceo_analysis"]
+  max_memory_entries: 20
+
+audit:
+  log_full_prompt: true
+  log_full_response: true
+  log_token_usage: true
+  log_cost: true
+  retention_days: 90

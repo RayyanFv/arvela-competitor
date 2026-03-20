@@ -1,0 +1,12 @@
+company_id: "arvela"
+display_name: "Arvela"
+industry: "HR SaaS"
+stage: "early_growth"
+target_market: "Indonesian companies, 50-500 employees"
+mission: "Simplify HR operations for growing Indonesian companies."
+okrs:
+  - objective: "Achieve PMF in HRIS module"
+    key_results:
+      - "100 paid customers by Q2 2026"
+      - "NPS > 40"
+      - "Churn < 5%/month"

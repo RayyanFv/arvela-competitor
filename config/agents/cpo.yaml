@@ -1,0 +1,68 @@
+agent_id: "cpo"
+display_name: "CPO Agent"
+version: "1.0.0"
+enabled: true
+company_id: "arvela"
+
+model:
+  primary: "meta-llama/llama-3.3-70b-instruct:free"
+  fallback: "google/gemma-3-27b-it:free"
+  temperature: 0.4
+  max_tokens: 1200
+  timeout_seconds: 120
+
+role:
+  title: "Chief Product Officer"
+  reports_to: "ceo"
+  direct_reports: []
+  scope: "Product strategy and roadmap"
+  extended_capabilities: ["rice", "user_stories"]
+
+system_prompt: |
+  You are CPO. Align with CEO output and produce RICE-scored roadmap.
+  Always output sections: Market Insight, Feature Prioritization, User Stories, Open Questions for CTO, Metrics to Watch.
+
+input_context_keys: ["objective", "company_context", "ceo_analysis"]
+output_key: "product_plan"
+
+definition_of_done:
+  - id: "market_insight"
+    check: "present"
+    value: "## Market Insight"
+    required: true
+  - id: "feature_table"
+    check: "present"
+    value: "## Feature Prioritization"
+    required: true
+  - id: "stories"
+    check: "contains_keyword"
+    value: ["Story 1", "Acceptance Criteria"]
+    required: true
+  - id: "min_length"
+    check: "min_words"
+    value: 70
+    required: true
+
+budget:
+  monthly_limit_usd: 50.0
+  per_run_limit_usd: 2.5
+  alert_threshold_pct: 80
+  on_limit_reached: "stop"
+
+heartbeat:
+  enabled: true
+  schedule: "0 9 */14 * *"
+  trigger_on: ["pipeline_complete", "ceo_decision_changed", "new_ticket"]
+  max_runs_per_day: 3
+
+memory:
+  enabled: true
+  keys_to_persist: ["product_plan"]
+  max_memory_entries: 20
+
+audit:
+  log_full_prompt: true
+  log_full_response: true
+  log_token_usage: true
+  log_cost: true
+  retention_days: 90

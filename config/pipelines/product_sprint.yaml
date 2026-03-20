@@ -1,0 +1,38 @@
+pipeline_id: "product_sprint"
+display_name: "Product Sprint"
+company_id: "arvela"
+enabled: true
+
+objective:
+  text: "[REQUIRED]"
+  focus_area: "product"
+  horizon: "sprint"
+
+sequence:
+  - step: 1
+    agent_id: "cpo"
+    task: "Create a product sprint plan and scored backlog aligned to objective."
+    skip_if: null
+    timeout_minutes: 8
+  - step: 2
+    agent_id: "cto"
+    task: "Create technical implementation and QA plan for selected sprint backlog."
+    skip_if: null
+    timeout_minutes: 8
+
+on_dod_failure:
+  action: "halt"
+  max_retries: 1
+  retry_prompt_suffix: "Your output missed: {failed_checks}"
+  notify_agent: "ceo"
+
+pipeline_budget:
+  max_total_usd: 3.0
+  on_exceeded: "halt"
+
+output:
+  save_individual: true
+  save_combined_report: true
+  combined_report_format: "markdown"
+  output_dir: "storage/outputs"
+  timestamp_files: true

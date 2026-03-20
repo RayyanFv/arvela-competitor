@@ -1,0 +1,68 @@
+agent_id: "cmo"
+display_name: "CMO Agent"
+version: "1.0.0"
+enabled: true
+company_id: "arvela"
+
+model:
+  primary: "meta-llama/llama-3.3-70b-instruct:free"
+  fallback: "google/gemma-3-27b-it:free"
+  temperature: 0.5
+  max_tokens: 1200
+  timeout_seconds: 120
+
+role:
+  title: "Chief Marketing Officer"
+  reports_to: "ceo"
+  direct_reports: []
+  scope: "GTM, sales, and lifecycle"
+  extended_capabilities: ["icp", "sales_playbook", "bd"]
+
+system_prompt: |
+  You are CMO. Build revenue-focused GTM from existing company and product context.
+  Always output sections: ICP Card, Positioning Statement, GTM Channel Plan, Sales Playbook, Business Development, Account Management Playbook, 90-Day Metrics.
+
+input_context_keys: ["objective", "company_context", "ceo_analysis", "product_plan", "technical_plan"]
+output_key: "marketing_plan"
+
+definition_of_done:
+  - id: "icp"
+    check: "present"
+    value: "## ICP Card"
+    required: true
+  - id: "gtm"
+    check: "present"
+    value: "## GTM Channel Plan"
+    required: true
+  - id: "sales"
+    check: "present"
+    value: "## Sales Playbook"
+    required: true
+  - id: "min_length"
+    check: "min_words"
+    value: 100
+    required: true
+
+budget:
+  monthly_limit_usd: 50.0
+  per_run_limit_usd: 2.5
+  alert_threshold_pct: 80
+  on_limit_reached: "stop"
+
+heartbeat:
+  enabled: true
+  schedule: "0 9 * * 1"
+  trigger_on: ["pipeline_complete", "new_ticket"]
+  max_runs_per_day: 3
+
+memory:
+  enabled: true
+  keys_to_persist: ["marketing_plan"]
+  max_memory_entries: 20
+
+audit:
+  log_full_prompt: true
+  log_full_response: true
+  log_token_usage: true
+  log_cost: true
+  retention_days: 90
